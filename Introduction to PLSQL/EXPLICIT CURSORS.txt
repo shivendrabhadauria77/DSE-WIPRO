@@ -1,0 +1,406 @@
+EXPLICIT CURSORS
+
+Q1) Write a implicit cursor that will prompt for a JOB and delete the employees working in that Job.
+Store the number of records deleted in a session variable.
+
+SOLUTION) 
+-- Define the session variable (Run this once in your session)
+VARIABLE deleted_count NUMBER;
+
+BEGIN
+    -- Delete statement using a substitution variable (&job_title) for prompting
+    -- SQL%ROWCOUNT is the implicit cursor attribute used to count affected rows
+    DELETE FROM employees 
+    WHERE job_id = '&job_title';
+
+    -- Store the row count into the session variable
+    :deleted_count := SQL%ROWCOUNT;
+    
+    COMMIT;
+END;
+/
+
+-- To verify the result:
+PRINT deleted_count;
+
+
+Q2) Rollback the the previous Delete Statement.
+
+SOLUTION) ROLLBACK;
+
+
+Q3) Write a program that displays the Top N salaries using simple Explicit Cursors.
+
+SOLUTION) 
+
+DECLARE
+   -- Declare N (The number of top records you want)
+   v_n NUMBER := 5; 
+   
+   -- Define the Explicit Cursor
+   CURSOR emp_cursor IS
+      SELECT salary 
+      FROM employees 
+      ORDER BY salary DESC;
+      
+   v_salary employees.salary%TYPE;
+
+BEGIN
+   OPEN emp_cursor;
+   
+   DBMS_OUTPUT.PUT_LINE('Top ' || v_n || ' Salaries:');
+   
+   FOR i IN 1..v_n LOOP
+      FETCH emp_cursor INTO v_salary;
+      
+      -- Exit if there are fewer than N records in the table
+      EXIT WHEN emp_cursor%NOTFOUND;
+      
+      DBMS_OUTPUT.PUT_LINE(i || ': ' || v_salary);
+   END LOOP;
+
+   CLOSE emp_cursor;
+END;
+/
+
+
+Q4) Create a Simple Explicit Cursor that displays all the employees who are earning more than the average salary of the Emp Table.
+
+SOLUTION) 
+
+SET SERVEROUTPUT ON;
+
+DECLARE
+    -- Step 1: Declare the cursor
+    CURSOR emp_cursor IS
+        SELECT ename, sal 
+        FROM emp 
+        WHERE sal > (SELECT AVG(sal) FROM emp);
+    
+    -- Variables to hold data
+    v_ename emp.ename%TYPE;
+    v_sal   emp.sal%TYPE;
+
+BEGIN
+    -- Step 2: Open the cursor
+    OPEN emp_cursor;
+    
+    DBMS_OUTPUT.PUT_LINE('Employees earning more than the average:');
+    DBMS_OUTPUT.PUT_LINE('---------------------------------------');
+
+    LOOP
+        -- Step 3: Fetch data into variables
+        FETCH emp_cursor INTO v_ename, v_sal;
+        EXIT WHEN emp_cursor%NOTFOUND;
+        
+        -- Step 4: Display the result
+        DBMS_OUTPUT.PUT_LINE('Name: ' || v_ename || ' | Salary: ' || v_sal);
+    END LOOP;
+
+    -- Step 5: Close the cursor
+    CLOSE emp_cursor;
+END;
+/
+
+
+Q5) Create a Simple Explicit cursor that displays the employees who earn more than 2000 and have joined the company after 15-Jun-1981.
+Print the output: organization on <>. earns <> and joined the
+
+SOLUTION) 
+
+SET SERVEROUTPUT ON;
+
+DECLARE
+    -- 1. Declare the Explicit Cursor
+    CURSOR emp_cursor IS
+        SELECT ename, sal, hiredate
+        FROM emp
+        WHERE sal > 2000 
+          AND hiredate > TO_DATE('15-Jun-1981', 'DD-Mon-YYYY');
+          
+    -- Variables to hold fetched data
+    v_ename    emp.ename%TYPE;
+    v_sal      emp.sal%TYPE;
+    v_hiredate emp.hiredate%TYPE;
+
+BEGIN
+    -- 2. Open the Cursor
+    OPEN emp_cursor;
+
+    LOOP
+        -- 3. Fetch data into variables
+        FETCH emp_cursor INTO v_ename, v_sal, v_hiredate;
+        
+        -- Exit when no more records are found
+        EXIT WHEN emp_cursor%NOTFOUND;
+
+        -- 4. Print the output in the requested format
+        DBMS_OUTPUT.PUT_LINE(v_ename || ' earns ' || v_sal || 
+                             ' and joined the organization on ' || v_hiredate);
+    END LOOP;
+
+    -- 5. Close the Cursor
+    CLOSE emp_cursor;
+END;
+/
+
+
+Q6) Create a Simple Explicit cursor that displays the hiredate in the format DD-MM-RRRR and Day. Sort the records on DAY starting from Saturday.
+
+SOLUTION) 
+
+DECLARE
+  -- 1. Declare the explicit cursor
+  CURSOR c_emp_hiredates IS
+    SELECT 
+      TO_CHAR(hire_date, 'DD-MM-YYYY') AS formatted_date,
+      TO_CHAR(hire_date, 'Day') AS hire_day
+    FROM employees
+    ORDER BY 
+      -- Custom sort to start the week on Saturday
+      DECODE(TO_CHAR(hire_date, 'DY', 'NLS_DATE_LANGUAGE=ENGLISH'),
+             'SAT', 1, 
+             'SUN', 2, 
+             'MON', 3, 
+             'TUE', 4, 
+             'WED', 5, 
+             'THU', 6, 
+             'FRI', 7);
+
+  -- Variables to hold fetch results
+  v_date VARCHAR2(20);
+  v_day  VARCHAR2(20);
+
+BEGIN
+  -- 2. Open the cursor
+  OPEN c_emp_hiredates;
+
+  LOOP
+    -- 3. Fetch data into variables
+    FETCH c_emp_hiredates INTO v_date, v_day;
+    EXIT WHEN c_emp_hiredates%NOTFOUND;
+
+    -- 4. Display the results
+    DBMS_OUTPUT.PUT_LINE('Hire Date: ' || v_date || ' | Day: ' || v_day);
+  END LOOP;
+
+  -- 5. Close the cursor
+  CLOSE c_emp_hiredates;
+END;
+/
+
+
+Q7) Create a simple explicit cursor that displays the employees names and commission amounts. If an employee does not earn commission, show "No Commission". Label the column COMM.
+
+SOLUTION) 
+
+SET SERVEROUTPUT ON;
+
+DECLARE
+   -- Declare the explicit cursor
+   CURSOR emp_cursor IS
+      SELECT last_name, 
+             NVL(TO_CHAR(commission_pct), 'No Commission') AS COMM
+      FROM employees;
+      
+   -- Declare variables to hold fetched data
+   v_name employees.last_name%TYPE;
+   v_comm VARCHAR2(20);
+
+BEGIN
+   -- Open the cursor
+   OPEN emp_cursor;
+   
+   LOOP
+      -- Fetch data into variables
+      FETCH emp_cursor INTO v_name, v_comm;
+      EXIT WHEN emp_cursor%NOTFOUND;
+      
+      -- Display the results
+      DBMS_OUTPUT.PUT_LINE('Name: ' || v_name || ' | COMM: ' || v_comm);
+   END LOOP;
+   
+   -- Close the cursor
+   CLOSE emp_cursor;
+END;
+/
+
+
+Q8) Create a parameter cursor that takes DEPTNO as a parameter and update the star column with *.
+Every represent a 1000.
+For example: If the employees salary is 5000 then update star column with *******
+Use Parameter Cursor, CURSOR WITH FOR LOOP and WHERE CURRENT OF OPTION.
+
+SOLUTION) 
+
+DECLARE
+  -- 1. Parameterized cursor with FOR UPDATE clause
+  CURSOR emp_cursor (p_deptno NUMBER) IS
+    SELECT salary, star
+    FROM employees
+    WHERE deptno = p_deptno
+    FOR UPDATE OF star;
+
+  v_star_string VARCHAR2(100);
+  v_num_stars   NUMBER;
+  v_target_dept NUMBER := 10; -- Example Dept ID
+BEGIN
+  -- 2. Cursor FOR LOOP
+  FOR emp_rec IN emp_cursor(v_target_dept) LOOP
+    
+    -- Calculate number of stars (Salary / 1000)
+    v_num_stars := TRUNC(emp_rec.salary / 1000);
+    
+    -- Generate the star string
+    v_star_string := RPAD('*', v_num_stars, '*');
+
+    -- 3. Update using WHERE CURRENT OF
+    UPDATE employees
+    SET star = v_star_string
+    WHERE CURRENT OF emp_cursor;
+    
+  END LOOP;
+  
+  COMMIT;
+END;
+/
+
+
+Q9) Write a Parameter Cursor program that promotes CLERK who earn more than 1000 to SR CLERK and increase the salary by 10%. Pass CLERK as a parameter to the Cursor. Use Parameter Cursor, CUSOR WITH FOR LOOP and CURSOR WITH UPDATE CLAUSE.
+
+SOLUTION) 
+
+DECLARE
+  -- Parameterized cursor definition
+  CURSOR c_emp (p_job VARCHAR2) IS
+    SELECT job, sal
+    FROM emp
+    WHERE job = p_job AND sal > 1000
+    FOR UPDATE; -- Required for CURRENT OF clause
+
+BEGIN
+  -- FOR loop automatically opens, fetches, and closes the cursor
+  -- Passing 'CLERK' as the parameter
+  FOR r_emp IN c_emp('CLERK') LOOP
+    
+    UPDATE emp
+    SET job = 'SR CLERK',
+        sal = sal * 1.10
+    WHERE CURRENT OF c_emp;
+    
+  END LOOP;
+
+  COMMIT;
+  DBMS_OUTPUT.PUT_LINE('Promotions and salary increments processed successfully.');
+END;
+/
+
+
+Q10) Display entire record from the Dept table by passing a DEPTNO.
+Increase the Salary of employees working in deptno 10 by 15%, Deptno 20 by 15% and others by 5% Also display the corresponding the employees working in that Dept.
+Use a parameter Cursor Update clause. For Loop Cursor and Cursor with
+
+SOLUTION) Task 1: Display entire record from the Dept table by passing a DEPTNO
+
+DECLARE
+  -- Defining a parameter cursor
+  CURSOR dept_cur (p_deptno NUMBER) IS
+    SELECT * FROM Dept WHERE DEPTNO = p_deptno;
+    
+  v_dept_rec Dept%ROWTYPE;
+BEGIN
+  -- Passing department number 10 as a parameter
+  OPEN dept_cur(10);
+  FETCH dept_cur INTO v_dept_rec;
+  
+  IF dept_cur%FOUND THEN
+    DBMS_OUTPUT.PUT_LINE('Dept No: ' || v_dept_rec.DEPTNO || 
+                         ' Name: ' || v_dept_rec.DNAME || 
+                         ' Location: ' || v_dept_rec.LOC);
+  ELSE
+    DBMS_OUTPUT.PUT_LINE('Department not found.');
+  END IF;
+  
+  CLOSE dept_cur;
+END;
+
+Task 2: Increase Salary based on Dept and display employees
+
+DECLARE
+  -- Cursor with FOR UPDATE clause to allow positioning for updates
+  CURSOR emp_cur IS
+    SELECT empno, ename, deptno, sal 
+    FROM emp 
+    FOR UPDATE OF sal;
+    
+  v_inc_pct NUMBER;
+BEGIN
+  -- Using a Cursor FOR LOOP
+  FOR emp_rec IN emp_cur LOOP
+    -- Determine increase percentage
+    IF emp_rec.deptno = 10 OR emp_rec.deptno = 20 THEN
+      v_inc_pct := 0.15; -- 15%
+    ELSE
+      v_inc_pct := 0.05; -- 5%
+    END IF;
+
+    -- Update the salary using the CURRENT OF clause
+    UPDATE emp 
+    SET sal = sal + (sal * v_inc_pct)
+    WHERE CURRENT OF emp_cur;
+
+    -- Display the corresponding employee details
+    DBMS_OUTPUT.PUT_LINE('Updated Emp: ' || emp_rec.ename || 
+                         ' | Dept: ' || emp_rec.deptno || 
+                         ' | New Sal: ' || (emp_rec.sal * (1 + v_inc_pct)));
+  END LOOP;
+  
+  COMMIT;
+END;
+
+
+Q11) Write a program that will prompt the user for a CHOICE. IF CHOICE is 1 then display all the employees who earn more than 2000 from EMP table else display all the Employees who earn less than 2000.
+Use REF CURSORS.
+
+SOLUTION)
+
+SET SERVEROUTPUT ON;
+SET VERIFY OFF;
+
+DECLARE
+    -- Define a weak REF CURSOR type
+    TYPE emp_ref_cursor IS REF CURSOR;
+    rec_cursor emp_ref_cursor;
+    
+    -- Variable to hold employee records
+    v_emp_rec emp%ROWTYPE;
+    
+    -- Variable for user input
+    v_choice NUMBER := &CHOICE; 
+BEGIN
+    -- Logic to open the cursor based on user choice
+    IF v_choice = 1 THEN
+        OPEN rec_cursor FOR 
+            SELECT * FROM emp WHERE sal > 2000;
+        DBMS_OUTPUT.PUT_LINE('Employees earning more than 2000:');
+    ELSE
+        OPEN rec_cursor FOR 
+            SELECT * FROM emp WHERE sal < 2000;
+        DBMS_OUTPUT.PUT_LINE('Employees earning less than 2000:');
+    END IF;
+
+    -- Fetch and display results
+    LOOP
+        FETCH rec_cursor INTO v_emp_rec;
+        EXIT WHEN rec_cursor%NOTFOUND;
+        DBMS_OUTPUT.PUT_LINE('Name: ' || v_emp_rec.ename || ' | Salary: ' || v_emp_rec.sal);
+    END LOOP;
+
+    CLOSE rec_cursor;
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('An error occurred: ' || SQLERRM);
+END;
+/
+ 
+

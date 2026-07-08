@@ -1,0 +1,30 @@
+WORKING WITH COMPOSITE DATA TYPES
+
+Q1) Write a program that will display the entire row by passing the empno. (Use %ROWTYPE)
+
+SOLUTION) 
+DECLARE
+   -- Declare a record variable based on the structure of the EMP table
+   emp_rec emp%ROWTYPE;
+   
+   -- Variable to pass the empno
+   v_empno emp.empno%TYPE := &enter_employee_number; 
+BEGIN
+   -- Fetch the entire row into the record variable
+   SELECT * INTO emp_rec 
+   FROM emp 
+   WHERE empno = v_empno;
+
+   -- Display the details (assuming standard columns: empno, ename, job, sal)
+   DBMS_OUTPUT.PUT_LINE('Employee ID:   ' || emp_rec.empno);
+   DBMS_OUTPUT.PUT_LINE('Employee Name: ' || emp_rec.ename);
+   DBMS_OUTPUT.PUT_LINE('Job Title:     ' || emp_rec.job);
+   DBMS_OUTPUT.PUT_LINE('Salary:        ' || emp_rec.sal);
+
+EXCEPTION
+   WHEN NO_DATA_FOUND THEN
+      DBMS_OUTPUT.PUT_LINE('No employee found with ID: ' || v_empno);
+   WHEN OTHERS THEN
+      DBMS_OUTPUT.PUT_LINE('An error occurred.');
+END;
+/

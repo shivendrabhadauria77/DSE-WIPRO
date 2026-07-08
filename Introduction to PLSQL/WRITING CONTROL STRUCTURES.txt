@@ -1,0 +1,115 @@
+WRITING CONTROL STRUCTURES
+
+Q1) Write a program that will prompt for a EMPNO, ENAME, SAL. If EMPNO does not exists in EMP table then INSERT the EMPNO, ENAME, SAL into the EMP table else UPDATE ENAME, SAL for that EMPNO.
+
+SOLUTION) 
+
+DECLARE
+    v_empno EMP.EMPNO%TYPE := &Enter_Employee_Number;
+    v_ename EMP.ENAME%TYPE := '&Enter_Employee_Name';
+    v_sal   EMP.SAL%TYPE   := &Enter_Salary;
+BEGIN
+    MERGE INTO EMP e
+    USING (SELECT v_empno as empno, v_ename as ename, v_sal as sal FROM dual) src
+    ON (e.EMPNO = src.empno)
+    WHEN MATCHED THEN
+        UPDATE SET e.ENAME = src.ename, e.SAL = src.sal
+    WHEN NOT MATCHED THEN
+        INSERT (EMPNO, ENAME, SAL)
+        VALUES (src.empno, src.ename, src.sal);
+
+    COMMIT;
+    DBMS_OUTPUT.PUT_LINE('Record processed successfully.');
+END;
+/
+
+
+Q2) Write a program that will prompt for number and display whether the number is ODD or EVEN number.
+SOLUTION) 
+
+SET SERVEROUTPUT ON;
+
+DECLARE
+    num NUMBER;
+BEGIN
+    num := &num;
+
+    IF MOD(num, 2) = 0 THEN
+        DBMS_OUTPUT.PUT_LINE('EVEN NUMBER');
+    ELSE
+        DBMS_OUTPUT.PUT_LINE('ODD NUMBER');
+    END IF;
+END;
+/
+
+Q3) Write program that prompts for EMPNO and update his salary based on the below specification:
+If the employee belongs to DEPTNO 10 then update his salary by 10%.
+If the employee belongs to DEPTNO 20 then update his salary by 15%.
+If the employee belongs to other DEPTNO then update his salary with SALARY+COMM.
+
+SOLUTION) 
+
+DECLARE
+    v_empno EMP.EMPNO%TYPE := &Enter_Employee_Number;
+    v_deptno EMP.DEPTNO%TYPE;
+BEGIN
+    -- Fetch the department number for the given employee
+    SELECT DEPTNO INTO v_deptno 
+    FROM EMP 
+    WHERE EMPNO = v_empno;
+
+    IF v_deptno = 10 THEN
+        UPDATE EMP 
+        SET SAL = SAL * 1.10 
+        WHERE EMPNO = v_empno;
+        
+    ELSIF v_deptno = 20 THEN
+        UPDATE EMP 
+        SET SAL = SAL * 1.15 
+        WHERE EMPNO = v_empno;
+        
+    ELSE
+        UPDATE EMP 
+        SET SAL = SAL + NVL(COMM, 0) 
+        WHERE EMPNO = v_empno;
+    END IF;
+
+    COMMIT;
+    DBMS_OUTPUT.PUT_LINE('Salary updated successfully for EMPNO: ' || v_empno);
+
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        DBMS_OUTPUT.PUT_LINE('Error: Employee ID not found.');
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('An unexpected error occurred.');
+END;
+
+Q4) In sql Prompt create a table MYTABLE1 with RESULT as a column of number datatype.
+Write a program that will insert record in the mytable from 1,2,3... to 10 values.
+Do not insert record 6 and 8
+
+SOLUTION) 
+
+1. Create the Table:
+CREATE TABLE MYTABLE1 (
+    RESULT NUMBER
+);
+
+2. Insert Records (PL/SQL Program)
+
+BEGIN
+    FOR i IN 1..10 LOOP
+        -- Skip numbers 6 and 8
+        IF i NOT IN (6, 8) THEN
+            INSERT INTO MYTABLE1 (RESULT) VALUES (i);
+        END IF;
+    END LOOP;
+    COMMIT;
+END;
+/
+
+
+3.  Verify Results
+
+SELECT * FROM MYTABLE1;
+
