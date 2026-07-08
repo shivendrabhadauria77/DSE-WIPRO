@@ -1,0 +1,12 @@
+MANAGING DEPENDENCIES
+
+Q1) Use the Deptree view to generate all the dependencies for DEPT table.
+
+SOLUTION) 
+
+-- Generate dependency tree for DEPT table
+EXECUTE DEPTREE_FILL('TABLE', 'SCOTT', 'DEPT');
+
+-- Display dependencies
+SELECT * 
+FROM DEPTREE;

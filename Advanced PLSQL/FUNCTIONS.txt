@@ -1,0 +1,249 @@
+FUNCTIONS
+
+Q1) Create a Function GET_JOB, that will return JOB of an Employee. Define a session variable TITLE allowing a length of 35 characters. Invoke the function to return the value in the session variable and print.
+
+SOLUTION) 
+
+-- 1. Create the Function
+CREATE OR REPLACE FUNCTION GET_JOB (p_emp_id IN NUMBER) 
+RETURN VARCHAR2 IS
+    v_job VARCHAR2(35);
+BEGIN
+    SELECT job_id INTO v_job 
+    FROM employees 
+    WHERE employee_id = p_emp_id;
+    
+    RETURN v_job;
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RETURN 'Employee Not Found';
+END;
+/
+
+-- 2. Define the session variable (Bind Variable)
+VARIABLE TITLE VARCHAR2(35);
+
+-- 3. Invoke the function to return value into the variable and print
+BEGIN
+    -- Example using Employee ID 100
+    :TITLE := GET_JOB(100);
+END;
+/
+
+PRINT TITLE;
+
+
+Q2) Create a function GET_ANNUAL_SAL that will calculate the annual salary of an Employee. Call the function from a SELECT statement against the EMP table for employees in DEPTNO 30.
+
+SOLUTION) 
+
+1. Create the Function
+CREATE OR REPLACE FUNCTION GET_ANNUAL_SAL (p_sal IN NUMBER) 
+RETURN NUMBER 
+IS
+BEGIN
+    RETURN (p_sal * 12);
+END;
+/
+
+2. Call the Function
+SELECT ename, sal, GET_ANNUAL_SAL(sal) AS annual_salary
+FROM emp
+WHERE deptno = 30;
+
+
+Q3) Assuming that there is no relationship in DEPT and EMP tables.
+Create a function VALID_DEPTNO from the DEPT table for an specific DEPTNO. Return a BOOLEAN value TRUE if DEPTNO exists.
+Create a procedure ADD_EMP that will insert EMPNO, ENAME, SAL, DEPTNO in the EMP table. The new row should be added in EMP table only if the function VALID_DEPTNO return TRUE else alert the user with a message.
+
+SOLUTION) 
+
+1. Function: VALID_DEPTNO
+CREATE OR REPLACE FUNCTION VALID_DEPTNO (p_deptno IN DEPT.DEPTNO%TYPE) 
+RETURN BOOLEAN 
+IS
+    v_count NUMBER;
+BEGIN
+    SELECT COUNT(*) INTO v_count 
+    FROM DEPT 
+    WHERE DEPTNO = p_deptno;
+
+    IF v_count > 0 THEN
+        RETURN TRUE;
+    ELSE
+        RETURN FALSE;
+    END IF;
+END;
+/
+
+2. Procedure: ADD_EMP
+CREATE OR REPLACE PROCEDURE ADD_EMP (
+    p_empno  IN EMP.EMPNO%TYPE,
+    p_ename  IN EMP.ENAME%TYPE,
+    p_sal    IN EMP.SAL%TYPE,
+    p_deptno IN EMP.DEPTNO%TYPE
+) 
+IS
+BEGIN
+    -- Use the function to check if the DEPTNO is valid
+    IF VALID_DEPTNO(p_deptno) THEN
+        INSERT INTO EMP (EMPNO, ENAME, SAL, DEPTNO)
+        VALUES (p_empno, p_ename, p_sal, p_deptno);
+        
+        DBMS_OUTPUT.PUT_LINE('Employee added successfully.');
+    ELSE
+        -- Alert the user if the department does not exist
+        DBMS_OUTPUT.PUT_LINE('Error: Invalid DEPTNO. Department does not exist.');
+    END IF;
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('An error occurred: ' || SQLERRM);
+END;
+/
+
+
+Q4) Create a PLSQL function CAL_REVERSE. This function will take a String and return reverse of this string. (Do not used Reverse inbuilt function).
+
+SOLUTION) 
+
+CREATE OR REPLACE FUNCTION CAL_REVERSE (p_input IN VARCHAR2) 
+RETURN VARCHAR2 
+IS
+    v_reversed VARCHAR2(32767);
+BEGIN
+    -- Loop backwards through the input string
+    FOR i IN REVERSE 1 .. LENGTH(p_input) LOOP
+        v_reversed := v_reversed || SUBSTR(p_input, i, 1);
+    END LOOP;
+
+    RETURN v_reversed;
+END;
+/
+
+
+Q5) Create a function CAL_PCT that calculates an employee percentage of salary. Pass EMPNO and percentage of salary to the function
+Call the function using EMP table Use 16% as default parameter for percentage.
+
+SOLUTION) 
+
+Function Creation
+CREATE OR REPLACE FUNCTION CAL_PCT (
+    p_empno IN emp.empno%TYPE,
+    p_pct IN NUMBER DEFAULT 16
+) RETURN NUMBER IS
+    v_sal emp.sal%TYPE;
+BEGIN
+    -- Fetch the salary for the given employee ID
+    SELECT sal INTO v_sal FROM emp WHERE empno = p_empno;
+    
+    -- Return the calculated percentage of the salary
+    RETURN v_sal * (p_pct / 100);
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        RETURN 0;
+END;
+/
+
+
+Calling the Function
+SELECT 
+    ename, 
+    sal, 
+    CAL_PCT(empno) AS calculated_pct_16
+FROM 
+    emp;
+
+
+Q6) Create a function that returns TRUE if the SAL is less than Average salary else return FALSE.
+Create a procedure REC_INSUPD that takes 3 arguments. EMPNO, ENAME, SAL. The user should insert row and update the rows only if the new salary is less than avgsal.
+
+SOLUTION) 
+
+1. Function to Check Salary
+CREATE OR REPLACE FUNCTION is_below_avg(p_sal NUMBER) 
+RETURN BOOLEAN IS
+    v_avg_sal NUMBER;
+BEGIN
+    SELECT AVG(sal) INTO v_avg_sal FROM emp;
+    
+    IF p_sal < v_avg_sal THEN
+        RETURN TRUE;
+    ELSE
+        RETURN FALSE;
+    END IF;
+END;
+/
+
+
+2. Procedure REC_INSUPD
+CREATE OR REPLACE PROCEDURE REC_INSUPD (
+    p_empno emp.empno%TYPE,
+    p_ename emp.ename%TYPE,
+    p_sal   emp.sal%TYPE
+) IS
+BEGIN
+    -- Only proceed if the new salary is less than the average
+    IF is_below_avg(p_sal) THEN
+        MERGE INTO emp e
+        USING DUAL
+        ON (e.empno = p_empno)
+        WHEN MATCHED THEN
+            UPDATE SET e.ename = p_ename, e.sal = p_sal
+        WHEN NOT MATCHED THEN
+            INSERT (empno, ename, sal)
+            VALUES (p_empno, p_ename, p_sal);
+            
+        DBMS_OUTPUT.PUT_LINE('Record processed successfully.');
+    ELSE
+        DBMS_OUTPUT.PUT_LINE('Salary is not less than average. No action taken.');
+    END IF;
+END;
+/
+
+
+Q7) Create a function CAL_LDATE that returns the DAY, MONTH DD, YYYY that the Employee joined the company. Return in GERMAN.
+
+SOLUTION) 
+
+CREATE OR REPLACE FUNCTION CAL_LDATE (p_hire_date IN DATE) 
+RETURN VARCHAR2 
+IS
+BEGIN
+    RETURN TO_CHAR(p_hire_date, 'DAY, MONTH DD, YYYY', 'NLS_DATE_LANGUAGE = GERMAN');
+END;
+/
+
+
+Q8) Create a function CAL_WORDS that returns a numeric value in Words.
+
+SOLUTION) 
+
+CREATE OR REPLACE FUNCTION CAL_WORDS(
+    num IN NUMBER
+)
+RETURN VARCHAR2
+IS
+BEGIN
+    RETURN TO_CHAR(TO_DATE(num, 'J'), 'JSP');
+END;
+/
+
+
+
+Q9) Wrap the function GET_JOB and then test using the USER_SOURCE
+SOLUTION)
+ 
+1. Wrap the Function
+BEGIN
+   EXECUTE IMMEDIATE 
+   DBMS_DDL.WRAP('CREATE OR REPLACE FUNCTION GET_JOB(p_id NUMBER) RETURN VARCHAR2 IS BEGIN RETURN ''CLERK''; END;');
+END;
+/
+
+2. Test Using USER_SOURCE
+SELECT text 
+FROM user_source 
+WHERE name = 'GET_JOB' 
+AND type = 'FUNCTION'
+ORDER BY line;
+

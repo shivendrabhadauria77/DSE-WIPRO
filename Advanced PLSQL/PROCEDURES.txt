@@ -1,0 +1,329 @@
+PROCEDURES
+
+Q1) Create a procedure ADD_DEPT.
+This procedure will take 3 IN arguments DEPTNO, DNAME, LOC.
+Insert these values into the DEPT table.
+Handle the exception if the user tries to insert a duplicate row using User Defined Exception Handler.
+
+SOLUTION) 
+
+CREATE OR REPLACE PROCEDURE ADD_DEPT (
+    p_deptno IN dept.deptno%TYPE,
+    p_dname  IN dept.dname%TYPE,
+    p_loc    IN dept.loc%TYPE
+) AS
+    -- Declare the User Defined Exception
+    duplicate_dept_error EXCEPTION;
+    PRAGMA EXCEPTION_INIT(duplicate_dept_error, -1); -- Associates with ORA-00001 (Unique Constraint)
+BEGIN
+    INSERT INTO dept (deptno, dname, loc)
+    VALUES (p_deptno, p_dname, p_loc);
+    
+    DBMS_OUTPUT.PUT_LINE('Department added successfully.');
+
+EXCEPTION
+    WHEN duplicate_dept_error THEN
+        DBMS_OUTPUT.PUT_LINE('Error: A department with ID ' || p_deptno || ' already exists.');
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('An unexpected error occurred: ' || SQLERRM);
+END;
+/
+
+
+Q2) Create a procedure UPDATE_DEPT and takes 3 arguments DEPTNO, DNAME, LOC. Update the DNAME, LOC for the corresponding DEPTNO.
+Handle exception when the user enters DEPTNO that does not exits.
+
+SOLUTION) 
+
+CREATE OR REPLACE PROCEDURE UPDATE_DEPT (
+    p_deptno IN dept.deptno%TYPE,
+    p_dname  IN dept.dname%TYPE,
+    p_loc    IN dept.loc%TYPE
+) AS
+    -- Define a custom exception for a non-existent department
+    ex_dept_not_found EXCEPTION;
+BEGIN
+    -- Perform the update
+    UPDATE dept
+    SET dname = p_dname,
+        loc = p_loc
+    WHERE deptno = p_deptno;
+
+    -- Check if any row was updated
+    IF SQL%NOTFOUND THEN
+        RAISE ex_dept_not_found;
+    END IF;
+
+    COMMIT;
+    DBMS_OUTPUT.PUT_LINE('Department updated successfully.');
+
+EXCEPTION
+    WHEN ex_dept_not_found THEN
+        DBMS_OUTPUT.PUT_LINE('Error: Department Number ' || p_deptno || ' does not exist.');
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('An unexpected error occurred: ' || SQLERRM);
+        ROLLBACK;
+END UPDATE_DEPT;
+/
+
+
+Q3) Create a procedure DELETE_DEPT which takes 1 argument DEPTNO. Delete the record for the corresponding DEPTNO. Handle the required exception when the user enters a not existence DEPTNO.
+
+SOLUTION) 
+
+CREATE OR REPLACE PROCEDURE DELETE_DEPT (p_deptno IN NUMBER) AS
+    -- Custom exception for non-existent department
+    e_invalid_dept EXCEPTION;
+BEGIN
+    -- Attempt to delete the record
+    DELETE FROM DEPT 
+    WHERE DEPTNO = p_deptno;
+
+    -- Check if any row was affected
+    IF SQL%NOTFOUND THEN
+        RAISE e_invalid_dept;
+    END IF;
+
+    COMMIT;
+    DBMS_OUTPUT.PUT_LINE('Department ' || p_deptno || ' deleted successfully.');
+
+EXCEPTION
+    WHEN e_invalid_dept THEN
+        DBMS_OUTPUT.PUT_LINE('Error: Department number ' || p_deptno || ' does not exist.');
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('An unexpected error occurred: ' || SQLERRM);
+        ROLLBACK;
+END DELETE_DEPT;
+/
+
+
+
+Q4) Create a user WIPRO.
+Modify your procedure ADD_DEPT to accept CURRENT_USER as an IN parameter.
+Grant EXECUTE permission on your procedure to WIPRO user.
+WIPRO user must have the DEPT table. Connect to WIPRO user and call the procedure ADD_DEPT.
+Check that the a new dept is added to the WIPRO user and not to SCOTT user.
+
+SOLUTION) 
+
+1. Create User WIPRO
+
+CREATE USER WIPRO IDENTIFIED BY password;
+GRANT CREATE SESSION, CREATE TABLE TO WIPRO;
+ALTER USER WIPRO QUOTA UNLIMITED ON USERS;
+
+
+2. Modify and Grant EXECUTE on ADD_DEPT
+
+
+-- Modify the procedure
+CREATE OR REPLACE PROCEDURE ADD_DEPT (
+    p_deptno IN NUMBER,
+    p_dname  IN VARCHAR2,
+    p_loc    IN VARCHAR2,
+    p_user   IN VARCHAR2 -- New IN parameter
+) IS
+BEGIN
+    -- Use dynamic SQL to ensure it inserts into the caller's table
+    EXECUTE IMMEDIATE 'INSERT INTO DEPT (deptno, dname, loc) VALUES (:1, :2, :3)' 
+    USING p_deptno, p_dname, p_loc;
+END;
+/
+
+-- Grant permission to WIPRO
+GRANT EXECUTE ON ADD_DEPT TO WIPRO;
+
+
+3. Setup DEPT Table in WIPRO
+
+-- Connect as WIPRO
+CREATE TABLE DEPT (
+    deptno NUMBER(2),
+    dname  VARCHAR2(14),
+    loc    VARCHAR2(13)
+);
+
+
+4. Execute the Procedure and Verify
+
+-- Call the procedure (replace SCOTT with the actual owner name)
+EXEC SCOTT.ADD_DEPT(50, 'MARKETING', 'NEW YORK', USER);
+
+-- Check WIPRO's table (Should have 1 row)
+SELECT * FROM DEPT;
+
+-- Check SCOTT's table (Should NOT have the new row)
+-- Run this as SCOTT:
+SELECT * FROM DEPT WHERE DEPTNO = 50;
+
+
+Q5) Modify the DEPT table to add a new column X. This will make the dependent procedures INVALID. Write a query and check the STATUS of ADD_DEPT, UPDATE_DEPT and DELETE_DEPT. Now make all these procedures VALID and check the STATUS once again. Drop Column X.
+
+SOLUTION) 
+
+1. Add Column X to DEPT Table
+ALTER TABLE DEPT ADD (X VARCHAR2(20));
+
+2. Check Procedure Status
+SELECT object_name, status 
+FROM user_objects 
+WHERE object_name IN ('ADD_DEPT', 'UPDATE_DEPT', 'DELETE_DEPT');
+
+
+3. Revalidate Procedures
+ALTER PROCEDURE ADD_DEPT COMPILE;
+ALTER PROCEDURE UPDATE_DEPT COMPILE;
+ALTER PROCEDURE DELETE_DEPT COMPILE;
+
+
+4. Drop Column X
+ALTER TABLE DEPT DROP COLUMN X;
+
+
+
+Q6) WRAP the ADD_DEPT procedure and test your procedure.
+SOLUTION) 
+
+Wrap the procedure
+wrap iname=ADD_DEPT.sql oname=ADD_DEPT_WRAP.sql
+
+Run the wrapped file
+@ADD_DEPT_WRAP.sql
+
+Test the procedure
+EXEC ADD_DEPT(50, 'SALES', 'MUMBAI');
+
+Verify
+SELECT * FROM DEPT
+WHERE DEPTNO = 50;
+
+
+Q7) Create a Procedure that will insert into the EMP_TEST table the employees who working in a given deptno and also update the employees salary in emp table by 20% in EMP table.
+Use Parameter Cursor, For Loop Cursor, Update clause Cursor.
+
+SOLUTION) 
+
+CREATE OR REPLACE PROCEDURE process_emp_by_dept (p_deptno IN emp.deptno%TYPE) IS
+    -- 1. Parameterized Cursor
+    CURSOR emp_cursor (c_deptno NUMBER) IS
+        SELECT * FROM emp 
+        WHERE deptno = c_deptno
+        FOR UPDATE OF sal; -- Required for "WHERE CURRENT OF"
+
+BEGIN
+    -- 2. For Loop Cursor
+    FOR emp_rec IN emp_cursor(p_deptno) LOOP
+        
+        -- Insert into EMP_TEST table
+        INSERT INTO emp_test (empno, ename, job, mgr, hiredate, sal, comm, deptno)
+        VALUES (emp_rec.empno, emp_rec.ename, emp_rec.job, emp_rec.mgr, 
+                emp_rec.hiredate, emp_rec.sal, emp_rec.comm, emp_rec.deptno);
+
+        -- 3. Update clause using Cursor (WHERE CURRENT OF)
+        UPDATE emp
+        SET sal = sal * 1.20
+        WHERE CURRENT OF emp_cursor;
+        
+    END LOOP;
+
+    COMMIT;
+    DBMS_OUTPUT.PUT_LINE('Processing complete for department: ' || p_deptno);
+EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        DBMS_OUTPUT.PUT_LINE('Error: ' || SQLERRM);
+END;
+/
+
+
+Q8) Create a Procedure that will delete all the employees from EMP Table for a given deptno and also insert those employees in TEST table.
+Use Parameter Cursor, Update Clause Cursor, For Loop
+Cursor
+
+SOLUTION) 
+
+CREATE OR REPLACE PROCEDURE move_employees (p_deptno IN emp.deptno%TYPE) IS
+    -- 1. Parameterized Cursor
+    -- 2. Update Clause Cursor (FOR UPDATE)
+    CURSOR emp_cursor (d_no NUMBER) IS
+        SELECT * FROM emp
+        WHERE deptno = d_no
+        FOR UPDATE;
+
+BEGIN
+    -- 3. For Loop Cursor
+    FOR emp_rec IN emp_cursor(p_deptno) LOOP
+        
+        -- Insert employee into TEST table
+        INSERT INTO test (empno, ename, job, mgr, hiredate, sal, comm, deptno)
+        VALUES (emp_rec.empno, emp_rec.ename, emp_rec.job, emp_rec.mgr, 
+                emp_rec.hiredate, emp_rec.sal, emp_rec.comm, emp_rec.deptno);
+        
+        -- Delete the current employee from EMP table
+        DELETE FROM emp
+        WHERE CURRENT OF emp_cursor;
+        
+    END LOOP;
+
+    COMMIT;
+    DBMS_OUTPUT.PUT_LINE('Employees moved successfully.');
+
+EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK;
+        DBMS_OUTPUT.PUT_LINE('Error: ' || SQLERRM);
+END;
+/
+
+
+Q9) Create a procedure GET_EMP that will take EMPNO (IN), ENAME (OUT), SAL (OUT). Handle the required the Exceptions. Call the procedure from the SQLPROMPT by defining 2 session variables and the output from these variables by passing 7788 EMPNO.
+
+SOLUTION) 
+
+1. Create the Procedure
+CREATE OR REPLACE PROCEDURE GET_EMP (
+    p_empno IN  emp.empno%TYPE,
+    p_ename OUT emp.ename%TYPE,
+    p_sal   OUT emp.sal%TYPE
+) AS
+BEGIN
+    SELECT ename, sal 
+    INTO p_ename, p_sal
+    FROM emp
+    WHERE empno = p_empno;
+EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+        DBMS_OUTPUT.PUT_LINE('Error: Employee ID ' || p_empno || ' not found.');
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('An unexpected error occurred.');
+END;
+/
+
+2. Call the Procedure from SQL*Plus / SQL Developer
+-- Step 1: Define session variables
+VARIABLE v_name VARCHAR2(50);
+VARIABLE v_salary NUMBER;
+
+-- Step 2: Execute the procedure with EMPNO 7788
+EXEC GET_EMP(7788, :v_name, :v_salary);
+
+-- Step 3: Display the output
+PRINT v_name;
+PRINT v_salary;
+
+
+Q10) Write a procedure that take an IN OUT argument for Mobile Number. Pass the Mobile Number as 9999999999 and the procedure should return (999)999-9999.
+
+SOLUTION) 
+
+CREATE OR REPLACE PROCEDURE format_mobile_no (
+    p_mobile IN OUT VARCHAR2
+) AS
+BEGIN
+    -- Formats '9999999999' into '(999)999-9999'
+    p_mobile := '(' || SUBSTR(p_mobile, 1, 3) || ')' || 
+                       SUBSTR(p_mobile, 4, 3) || '-' || 
+                       SUBSTR(p_mobile, 7, 4);
+END;
+/
+

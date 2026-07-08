@@ -1,0 +1,143 @@
+TRIGGERS
+
+Q1) Create a BEFORE trigger that will restrict the user from performing DML statements between 9 to 17 on EMP Table.
+
+SOLUTION) 
+
+CREATE OR REPLACE TRIGGER restrict_emp_dml
+BEFORE INSERT OR UPDATE OR DELETE ON EMP
+BEGIN
+    -- Check if current time is between 09:00 and 17:00
+    IF TO_CHAR(SYSDATE, 'HH24') BETWEEN '09' AND '17' THEN
+        RAISE_APPLICATION_ERROR(-20001, 'DML operations on EMP table are restricted between 09:00 and 17:00.');
+    END IF;
+END;
+/
+
+
+Q2) Create a Audit_Emp table with columns empno, username, trdate, trtype.
+Write a trigger for DML transaction
+1. If the user Inserts a row in the EMP table then simultaneously Insert a new row in the AUDIT_EMP table with the details of new empno, username (current user), date and time of insert and Tr_Type as 'I'
+2. If the user updates the EMPNO then Insert a new row in the AUDIT_EMP table with the old empno, username, date and time of update and 'U'
+3. If the user deletes the EMPNO then insert a new row in the AUDIT_EMP table with old empno, username, date and time of delete and 'D'.
+Make the transaction AUTONOMOUS to COMMIT. Use triggering functions INSERTING, UPDATING OR DELETING.
+
+SOLUTION) 
+
+Create Audit Table
+
+CREATE TABLE AUDIT_EMP (
+    EMPNO    NUMBER,
+    USERNAME VARCHAR2(30),
+    TRDATE   DATE,
+    TRTYPE   CHAR(1)
+);
+
+
+Create Trigger
+CREATE OR REPLACE TRIGGER TRG_AUDIT_EMP
+AFTER INSERT OR UPDATE OF EMPNO OR DELETE
+ON EMP
+FOR EACH ROW
+DECLARE
+    PRAGMA AUTONOMOUS_TRANSACTION;
+BEGIN
+    IF INSERTING THEN
+        INSERT INTO AUDIT_EMP
+        VALUES (:NEW.EMPNO, USER, SYSDATE, 'I');
+
+    ELSIF UPDATING THEN
+        INSERT INTO AUDIT_EMP
+        VALUES (:OLD.EMPNO, USER, SYSDATE, 'U');
+
+    ELSIF DELETING THEN
+        INSERT INTO AUDIT_EMP
+        VALUES (:OLD.EMPNO, USER, SYSDATE, 'D');
+    END IF;
+
+    COMMIT;
+END;
+/
+
+
+Q3) Create a complex view V3 that has EMPNO, ENAME, JOB, SAL, EMP.DEPTNO, DNAME, LOC from EMP, DEPT tables.
+Write a INSTEAD OF TRIGGER for INSERT OR UPDATE on V3 that will check for if the deptno inserted in the view does not exists in DEPT table, then it will INSERT the row in the DEPT table else it will UPDATE the DNAME, LOC of DEPT table for the corresponding DEPTNO. Again it will check if EMPNO exists or not in EMP table, if EMPNO does not exists then you have to INSERT the EMPNO, ENAME, SAL, JOB, DEPTNO into the EMP table else you have to UPDATE the ENAME, SAL, DEPTNO of EMP table.
+
+SOLUTION) 
+
+Create Complex View
+CREATE OR REPLACE VIEW V3 AS
+SELECT E.EMPNO, E.ENAME, E.JOB, E.SAL, 
+       E.DEPTNO, D.DNAME, D.LOC
+FROM EMP E, DEPT D
+WHERE E.DEPTNO = D.DEPTNO;
+/
+
+
+Create INSTEAD OF Trigger
+CREATE OR REPLACE TRIGGER TRG_V3
+INSTEAD OF INSERT OR UPDATE
+ON V3
+FOR EACH ROW
+BEGIN
+
+    -- Check DEPT table
+    BEGIN
+        INSERT INTO DEPT(DEPTNO, DNAME, LOC)
+        VALUES(:NEW.DEPTNO, :NEW.DNAME, :NEW.LOC);
+
+    EXCEPTION
+        WHEN DUP_VAL_ON_INDEX THEN
+            UPDATE DEPT
+            SET DNAME = :NEW.DNAME,
+                LOC = :NEW.LOC
+            WHERE DEPTNO = :NEW.DEPTNO;
+    END;
+
+
+    -- Check EMP table
+    BEGIN
+        INSERT INTO EMP(EMPNO, ENAME, JOB, SAL, DEPTNO)
+        VALUES(:NEW.EMPNO, :NEW.ENAME, :NEW.JOB,
+               :NEW.SAL, :NEW.DEPTNO);
+
+    EXCEPTION
+        WHEN DUP_VAL_ON_INDEX THEN
+            UPDATE EMP
+            SET ENAME = :NEW.ENAME,
+                SAL = :NEW.SAL,
+                DEPTNO = :NEW.DEPTNO
+            WHERE EMPNO = :NEW.EMPNO;
+    END;
+
+END;
+/
+
+
+
+Q4)Write a SYSTEM trigger that will restrict the SCOTT user from creating only TABLES.
+Use ORA_DICT_OBJ_TYPE.
+
+SOLUTION) 
+
+CREATE OR REPLACE TRIGGER restrict_scott_table_creation
+BEFORE CREATE ON DATABASE
+BEGIN
+    -- Check if the user is SCOTT and the object type is a TABLE
+    IF ORA_LOGIN_USER = 'SCOTT' AND ORA_DICT_OBJ_TYPE = 'TABLE' THEN
+        RAISE_APPLICATION_ERROR(-20001, 'User SCOTT is not allowed to create tables.');
+    END IF;
+END;
+/
+
+
+Q5) Create LOGON trigger that will change to default date format to DL format.
+
+SOLUTION) 
+
+CREATE OR REPLACE TRIGGER set_default_date_format
+AFTER LOGON ON DATABASE
+BEGIN
+    EXECUTE IMMEDIATE 'ALTER SESSION SET NLS_DATE_FORMAT = ''DD-MON-YYYY''';
+END;
+/
